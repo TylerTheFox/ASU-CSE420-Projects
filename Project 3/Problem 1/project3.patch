@@ -1,0 +1,272 @@
+diff -Naur src_old/mem/cache/replacement_policies/lru_ipv.cc src/mem/cache/replacement_policies/lru_ipv.cc
+--- src_old/mem/cache/replacement_policies/lru_ipv.cc	1969-12-31 16:00:00.000000000 -0800
++++ src/mem/cache/replacement_policies/lru_ipv.cc	2020-11-24 07:32:55.803563945 -0800
+@@ -0,0 +1,124 @@
++/**
++ * Copyright (c) 2018 Inria
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met: redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer;
++ * redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution;
++ * neither the name of the copyright holders nor the names of its
++ * contributors may be used to endorse or promote products derived from
++ * this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++#include "mem/cache/replacement_policies/lru_ipv.hh"
++
++#include <cassert>
++#include <memory>
++
++#include "params/LRUIPVRP.hh"
++
++const int ipv[] = { 0, 0, 1, 0, 3, 0, 1, 2, 1, 0, 5, 1, 0 };
++
++LRUIPVRP::LRUIPVRP(const Params *p)
++    : BaseReplacementPolicy(p)
++{
++}
++
++#define START_POSITION (13)
++#define END_POSITION (16)
++void
++LRUIPVRP::invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
++const
++{
++    // Reset last touch timestamp
++    std::static_pointer_cast<LRUReplData>(
++        replacement_data)->position = END_POSITION;
++}
++
++void
++LRUIPVRP::touch(const std::shared_ptr<ReplacementData>& replacement_data) const
++{
++    int start_pos = std::static_pointer_cast<LRUReplData>(replacement_data)->position;
++    ReplacementData *t1, *t2, *t3;
++    
++    for (int idx = start_pos; idx < start_pos; idx++)
++    {
++    	(*t1) = stack[start_pos];
++    	(*t2) = stack[idx++];
++    	
++    	t3 = t2;
++    	t2 = t1;
++    	t1 = t3;
++    }
++    
++     std::static_pointer_cast<LRUReplData>(replacement_data)->position = start_pos;
++}
++
++void
++LRUIPVRP::reset(const std::shared_ptr<ReplacementData>& replacement_data) const
++{
++    ReplacementData *t1, *t2, *t3;
++    
++    for (int idx = START_POSITION; idx < END_POSITION; idx++)
++    {
++    	(*t1) = stack[START_POSITION];
++    	(*t2) = stack[idx++];
++    	
++    	t3 = t2;
++    	t2 = t1;
++    	t1 = t3;
++    }
++    
++     std::static_pointer_cast<LRUReplData>(replacement_data)->position = START_POSITION;
++}
++
++#define EVICTION_POINT (15)
++ReplaceableEntry*
++LRUIPVRP::getVictim(const ReplacementCandidates& candidates) const
++{
++    // There must be at least one replacement candidate
++    assert(candidates.size() > 0);
++
++    // Visit all candidates to find victim
++    ReplaceableEntry* victim = candidates[0];
++    
++    for (auto& c : candidates)
++    {
++    	if (std::static_pointer_cast<LRUReplData>(c->replacementData)->position > EVICTION_POINT)
++    	{
++    		victim = c;
++    	}
++    }
++    
++    return victim;
++}
++
++std::shared_ptr<ReplacementData>
++LRUIPVRP::instantiateEntry()
++{
++    auto data_ptr = new LRUReplData();
++    stack.push_back(*data_ptr);
++    return std::shared_ptr<ReplacementData>(data_ptr);
++}
++
++LRUIPVRP*
++LRUIPVRPParams::create()
++{
++    return new LRUIPVRP(this);
++}
+diff -Naur src_old/mem/cache/replacement_policies/lru_ipv.hh src/mem/cache/replacement_policies/lru_ipv.hh
+--- src_old/mem/cache/replacement_policies/lru_ipv.hh	1969-12-31 16:00:00.000000000 -0800
++++ src/mem/cache/replacement_policies/lru_ipv.hh	2020-11-24 07:31:03.241681752 -0800
+@@ -0,0 +1,117 @@
++/**
++ * Copyright (c) 2018 Inria
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met: redistributions of source code must retain the above copyright
++ * notice, this list of conditions and the following disclaimer;
++ * redistributions in binary form must reproduce the above copyright
++ * notice, this list of conditions and the following disclaimer in the
++ * documentation and/or other materials provided with the distribution;
++ * neither the name of the copyright holders nor the names of its
++ * contributors may be used to endorse or promote products derived from
++ * this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ */
++
++/**
++ * @file
++ * Declaration of a Least Recently Used replacement policy.
++ * The victim is chosen using the last touch timestamp.
++ */
++
++#ifndef __MEM_CACHE_REPLACEMENT_POLICIES_LRUIPVRP_HH__
++#define __MEM_CACHE_REPLACEMENT_POLICIES_LRUIPVRP_HH__
++
++#include "mem/cache/replacement_policies/base.hh"
++#include <vector>
++
++struct LRUIPVRPParams;
++
++class LRUIPVRP : public BaseReplacementPolicy
++{
++  protected:
++    /** LRU-specific implementation of replacement data. */
++    struct LRUReplData : ReplacementData
++    {
++        /** Tick on which the entry was last touched. */
++        long long position;
++
++        /**
++         * Default constructor. Invalidate data.
++         */
++        LRUReplData() : position(0) {}
++    };
++
++   std::vector<ReplacementData> stack;
++  public:
++    /** Convenience typedef. */
++    typedef LRUIPVRPParams Params;
++
++    /**
++     * Construct and initiliaze this replacement policy.
++     */
++    LRUIPVRP(const Params *p);
++
++    /**
++     * Destructor.
++     */
++    ~LRUIPVRP() {}
++
++    /**
++     * Invalidate replacement data to set it as the next probable victim.
++     * Sets its last touch tick as the starting tick.
++     *
++     * @param replacement_data Replacement data to be invalidated.
++     */
++    void invalidate(const std::shared_ptr<ReplacementData>& replacement_data)
++                                                              const override;
++
++    /**
++     * Touch an entry to update its replacement data.
++     * Sets its last touch tick as the current tick.
++     *
++     * @param replacement_data Replacement data to be touched.
++     */
++    void touch(const std::shared_ptr<ReplacementData>& replacement_data) const
++                                                                     override;
++
++    /**
++     * Reset replacement data. Used when an entry is inserted.
++     * Sets its last touch tick as the current tick.
++     *
++     * @param replacement_data Replacement data to be reset.
++     */
++    void reset(const std::shared_ptr<ReplacementData>& replacement_data) const
++                                                                     override;
++
++    /**
++     * Find replacement victim using LRU timestamps.
++     *
++     * @param candidates Replacement candidates, selected by indexing policy.
++     * @return Replacement entry to be replaced.
++     */
++    ReplaceableEntry* getVictim(const ReplacementCandidates& candidates) const
++                                                                     override;
++
++    /**
++     * Instantiate a replacement data entry.
++     *
++     * @return A shared pointer to the new replacement data.
++     */
++    std::shared_ptr<ReplacementData> instantiateEntry() override;
++};
++
++#endif // __MEM_CACHE_REPLACEMENT_POLICIES_LRU_RP_HH__
+diff -Naur src_old/mem/cache/replacement_policies/ReplacementPolicies.py src/mem/cache/replacement_policies/ReplacementPolicies.py
+--- src_old/mem/cache/replacement_policies/ReplacementPolicies.py	2020-10-18 22:59:45.474698000 -0700
++++ src/mem/cache/replacement_policies/ReplacementPolicies.py	2020-11-18 21:17:05.799926000 -0800
+@@ -99,3 +99,10 @@
+     type = "WeightedLRURP"
+     cxx_class = "WeightedLRUPolicy"
+     cxx_header = "mem/cache/replacement_policies/weighted_lru_rp.hh"
++
++class LRUIPVRP(BaseReplacementPolicy):
++    type = "LRUIPVRP"
++    cxx_class = "LRUIPVRP"
++    cxx_header = "mem/cache/replacement_policies/lru_ipv.hh"
++
++
+diff -Naur src_old/mem/cache/replacement_policies/SConscript src/mem/cache/replacement_policies/SConscript
+--- src_old/mem/cache/replacement_policies/SConscript	2020-10-18 22:59:45.474698000 -0700
++++ src/mem/cache/replacement_policies/SConscript	2020-11-18 21:20:24.439883000 -0800
+@@ -40,3 +40,5 @@
+ Source('second_chance_rp.cc')
+ Source('tree_plru_rp.cc')
+ Source('weighted_lru_rp.cc')
++Source('lru_ipv.cc')
++
